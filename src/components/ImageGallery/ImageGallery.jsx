@@ -1,9 +1,8 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
 import Button from 'components/Button';
 import ImageGalleryItem from 'components/ImageGalleryItem';
 import Loader from 'components/Loader';
 import Message from 'components/Message';
-import { getSearchedImages } from 'services/pixabayAPI';
+import { useImageSearch } from 'hooks/useImageSearch';
 import css from './ImageGallery.module.css';
 import { ImageGalleryPropTypes } from './ImageGallery.types';
 
@@ -16,21 +15,7 @@ export default function ImageGallery({ searchQuery }) {
     error,
     hasNextPage,
     fetchNextPage,
-  } = useInfiniteQuery({
-    queryKey: ['search-image', searchQuery],
-    queryFn: ({ pageParam = 1 }) => getSearchedImages(searchQuery, pageParam),
-    enabled: searchQuery.length > 0,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    getNextPageParam: (_lastPage, pages) => {
-      const firstPage = pages[0];
-      if (pages.length < Math.ceil(firstPage.totalHits / firstPage.per_page)) {
-        return pages.length + 1;
-      }
-    },
-    select: data =>
-      data.pages.reduce((acc, page) => [...acc, ...page.hits], []),
-  });
+  } = useImageSearch(searchQuery);
 
   if (isError) {
     return <Message title={error.message} />;
@@ -53,7 +38,9 @@ export default function ImageGallery({ searchQuery }) {
       )}
 
       {isFetching && <Loader />}
-      {hasNextPage && <Button onClick={fetchNextPage}>Load more</Button>}
+      {!isFetching && hasNextPage && (
+        <Button onClick={fetchNextPage}>Load more</Button>
+      )}
     </>
   );
 }
