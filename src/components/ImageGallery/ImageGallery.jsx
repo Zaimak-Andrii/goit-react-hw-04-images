@@ -2,7 +2,7 @@ import Button from 'components/Button';
 import ImageGalleryItem from 'components/ImageGalleryItem';
 import Loader from 'components/Loader';
 import Message from 'components/Message';
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import { getSarchedImages } from 'services/pixabayAPI';
 import css from './ImageGallery.module.css';
 import { ImageGalleryPropTypes } from './ImageGallery.types';
@@ -14,81 +14,73 @@ const Status = {
   REJECTED: 'rejected',
 };
 
-export default class ImageGallery extends Component {
-  state = {
-    list: [],
-    isShowLoadMoreButton: false,
-    status: Status.IDLE,
-    error: null,
-  };
-  page = 1;
+export default function ImageGallery({
+  searchQuery,
+  page,
+  list,
+  onChangePage,
+  onChangeGalleryList,
+}) {
+  const [isShowLoadMoreButton, setIsShowLoadMoreButton] = useState(false);
+  const [status, setStatus] = useState(Status.IDLE);
+  const [error, setError] = useState(null);
 
-  componentDidUpdate(prevProps) {
-    if (prevProps.searchQuery !== this.props.searchQuery) {
-      this.fetchSearch(1);
-    }
+  useEffect(() => {
+    if (searchQuery.length === 0) return;
+
+    const fetchSearch = async () => {
+      try {
+        setStatus(Status.PENDING);
+        setError(null);
+        setIsShowLoadMoreButton(false);
+
+        const data = await getSarchedImages(searchQuery, page);
+
+        onChangeGalleryList(prev => [...prev, ...data.hits]);
+        setIsShowLoadMoreButton(page * data.per_page < data.totalHits);
+        setStatus(Status.RESOLVED);
+      } catch (err) {
+        setError(err.message);
+        setStatus(Status.REJECTED);
+      }
+    };
+
+    fetchSearch();
+  }, [searchQuery, page, onChangeGalleryList]);
+
+  if (status === Status.IDLE) {
+    return <Message title="Please enter search parameters" />;
   }
 
-  async fetchSearch(page) {
-    try {
-      this.setState({
-        status: Status.PENDING,
-        error: null,
-        isShowLoadMoreButton: false,
-        list: page === 1 ? [] : this.state.list,
-      });
-      this.page = page;
-      const data = await getSarchedImages(this.props.searchQuery, page);
-
-      this.setState(prevState => ({
-        status: Status.RESOLVED,
-        isShowLoadMoreButton: page * data.per_page < data.totalHits,
-        list: [...prevState.list, ...data.hits],
-      }));
-    } catch (err) {
-      this.setState({ status: Status.REJECTED, error: err.message });
-    }
+  if (status === Status.REJECTED) {
+    return <Message title={error} />;
   }
 
-  render() {
-    const { status, error, list, isShowLoadMoreButton } = this.state;
+  return (
+    <>
+      {list.length === 0 && status !== Status.PENDING ? (
+        <Message title={`Nothing was found for "${searchQuery}".`} />
+      ) : (
+        <ul className={css.imageGallery}>
+          {list.map(item => (
+            <ImageGalleryItem key={item.id} item={item} />
+          ))}
+        </ul>
+      )}
 
-    if (status === Status.IDLE) {
-      return <Message title="Please enter search parameters" />;
-    }
+      {status === Status.PENDING && <Loader />}
 
-    if (status === Status.REJECTED) {
-      return <Message title={error} />;
-    }
-
-    return (
-      <>
-        {list.length === 0 && status !== Status.PENDING ? (
-          <Message
-            title={`Nothing was found for "${this.props.searchQuery}".`}
-          />
-        ) : (
-          <ul className={css.imageGallery}>
-            {list.map(item => (
-              <ImageGalleryItem key={item.id} item={item} />
-            ))}
-          </ul>
-        )}
-
-        {status === Status.PENDING && <Loader />}
-
-        {isShowLoadMoreButton && (
-          <Button
-            onClick={() => {
-              this.fetchSearch(this.page + 1);
-            }}
-          >
-            Load more
-          </Button>
-        )}
-      </>
-    );
-  }
+      {isShowLoadMoreButton && (
+        <Button
+          onClick={() => {
+            onChangePage(prev => prev + 1);
+          }}
+        >
+          Load more
+        </Button>
+      )}
+    </>
+  );
 }
 
 ImageGallery.propTypes = ImageGalleryPropTypes;
