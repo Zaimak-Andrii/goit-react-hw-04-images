@@ -25,6 +25,7 @@ export default class ImageGalleryItem extends Component {
               className={css.imageGalleryItemImage}
               src={webformatURL}
               alt={tags}
+              loading="lazy"
             />
           </a>
         </li>
